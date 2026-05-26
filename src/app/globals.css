@@ -1,26 +1,116 @@
 @import "tailwindcss";
 
+/* ProvenSkills Design System */
 :root {
+  /* Brand Colors - Trust & Security Theme */
+  --proven-green-50: #ecfdf5;
+  --proven-green-100: #d1fae5;
+  --proven-green-200: #a7f3d0;
+  --proven-green-300: #6ee7b7;
+  --proven-green-400: #34d399;
+  --proven-green-500: #10b981;
+  --proven-green-600: #059669;
+  --proven-green-700: #047857;
+  --proven-green-800: #065f46;
+  --proven-green-900: #064e3b;
+
+  /* Trust Blue */
+  --proven-blue-50: #eff6ff;
+  --proven-blue-100: #dbeafe;
+  --proven-blue-200: #bfdbfe;
+  --proven-blue-300: #93c5fd;
+  --proven-blue-400: #60a5fa;
+  --proven-blue-500: #3b82f6;
+  --proven-blue-600: #2563eb;
+  --proven-blue-700: #1d4ed8;
+  --proven-blue-800: #1e40af;
+  --proven-blue-900: #1e3a8a;
+
+  /* Neutrals */
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #0f172a;
+  --muted: #64748b;
+  --border: #e2e8f0;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+
+  /* Semantic */
+  --success: #10b981;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --info: #3b82f6;
+}
+
+.dark {
+  --background: #0a0a0f;
+  --foreground: #f8fafc;
+  --muted: #94a3b8;
+  --border: #1e293b;
+  --card: #111118;
+  --card-foreground: #f8fafc;
 }
 
 @theme inline {
+  /* Colors */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  /* Brand */
+  --color-proven-green: var(--proven-green-500);
+  --color-proven-blue: var(--proven-blue-500);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --color-info: var(--info);
+
+  /* Fonts */
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+/* Base styles */
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Selection color */
+::selection {
+  background-color: var(--proven-green-500);
+  color: white;
+}
+
+/* Focus styles */
+*:focus-visible {
+  outline: 2px solid var(--proven-green-500);
+  outline-offset: 2px;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--border);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--muted);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--foreground);
 }
