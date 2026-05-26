@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
@@ -16,11 +16,13 @@ import {
   Check,
   Loader2,
   Sparkles,
+  AlertCircle,
 } from "lucide-react";
 import { Header, Footer } from "@/components/layout";
 import { Badge, LinkButton } from "@/components/ui";
 import { Spotlight, BackgroundGradient } from "@/components/ui/aceternity";
 import { cn } from "@/lib/utils";
+import { createSkill, becomeCreator } from "@/lib/actions";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import type { Profile } from "@/lib/db/profiles";
 import type { Category } from "@/lib/db/categories";
@@ -43,7 +45,9 @@ const steps: { id: Step; label: string; icon: React.ReactNode }[] = [
 export function SellPageClient({ user, profile, categories }: SellPageClientProps) {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState<Step>("info");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [isBecomingCreator, setIsBecomingCreator] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -79,13 +83,47 @@ export function SellPageClient({ user, profile, categories }: SellPageClientProp
   };
 
   const handleSubmit = async () => {
-    setIsSubmitting(true);
+    setError(null);
 
-    // Simulate API call (will be replaced with actual Supabase insert)
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    startTransition(async () => {
+      const result = await createSkill({
+        name: formData.name,
+        description: formData.description,
+        categoryId: formData.categoryId,
+        price: formData.price,
+        isFree: formData.isFree,
+        installCommand: formData.installCommand,
+        githubUrl: formData.githubUrl || undefined,
+        longDescription: formData.longDescription || undefined,
+        tags: formData.tags,
+      });
 
-    // For now, just redirect to dashboard
-    router.push("/dashboard");
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+
+      // Redirect to the new skill page or dashboard
+      if (result.slug) {
+        router.push(`/skills/${result.slug}`);
+      } else {
+        router.push("/dashboard");
+      }
+    });
+  };
+
+  const handleBecomeCreator = async () => {
+    setIsBecomingCreator(true);
+    const result = await becomeCreator();
+    setIsBecomingCreator(false);
+
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+
+    // Reload the page to reflect creator status
+    router.refresh();
   };
 
   // Check if user needs to become a creator first
@@ -140,14 +178,26 @@ export function SellPageClient({ user, profile, categories }: SellPageClientProp
                   </div>
                 </div>
 
+                {error && (
+                  <div className="mt-4 flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-500">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    {error}
+                  </div>
+                )}
+
                 <button
-                  onClick={() => {
-                    // TODO: Implement creator application
-                    alert("Creator applications coming soon!");
-                  }}
-                  className="w-full mt-8 rounded-xl bg-[var(--proven-green-500)] py-3 font-medium text-white hover:bg-[var(--proven-green-600)] transition-colors"
+                  onClick={handleBecomeCreator}
+                  disabled={isBecomingCreator}
+                  className="w-full mt-8 rounded-xl bg-[var(--proven-green-500)] py-3 font-medium text-white hover:bg-[var(--proven-green-600)] transition-colors disabled:opacity-50"
                 >
-                  Apply to Become a Creator
+                  {isBecomingCreator ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Processing...
+                    </span>
+                  ) : (
+                    "Become a Creator"
+                  )}
                 </button>
               </div>
             </BackgroundGradient>
@@ -473,6 +523,13 @@ export function SellPageClient({ user, profile, categories }: SellPageClientProp
                     </p>
                   </div>
 
+                  {error && (
+                    <div className="flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-500">
+                      <AlertCircle className="h-4 w-4 shrink-0" />
+                      {error}
+                    </div>
+                  )}
+
                   <div className="rounded-xl border border-border bg-background p-6 space-y-4">
                     <div className="flex justify-between">
                       <span className="text-muted">Name</span>
@@ -531,10 +588,10 @@ export function SellPageClient({ user, profile, categories }: SellPageClientProp
                 {currentStep === "review" ? (
                   <button
                     onClick={handleSubmit}
-                    disabled={isSubmitting}
+                    disabled={isPending}
                     className="flex items-center gap-2 rounded-xl bg-[var(--proven-green-500)] px-6 py-3 font-medium text-white hover:bg-[var(--proven-green-600)] transition-colors disabled:opacity-50"
                   >
-                    {isSubmitting ? (
+                    {isPending ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" />
                         Submitting...

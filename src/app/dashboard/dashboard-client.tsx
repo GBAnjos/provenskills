@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   User,
@@ -14,12 +15,15 @@ import {
   DollarSign,
   TrendingUp,
   ExternalLink,
+  Loader2,
+  Check,
 } from "lucide-react";
 import { Header, Footer } from "@/components/layout";
 import { Badge, LinkButton } from "@/components/ui";
 import { SkillCard } from "@/components/skills";
 import { Spotlight, BackgroundGradient } from "@/components/ui/aceternity";
 import { cn } from "@/lib/utils";
+import { updateProfile, becomeCreator } from "@/lib/actions";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import type { Profile } from "@/lib/db/profiles";
 import type { SkillWithRelations } from "@/lib/db/skills";
@@ -39,7 +43,20 @@ export function DashboardClient({
   creatorSkills,
   purchases,
 }: DashboardClientProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabType>("overview");
+  const [isPending, startTransition] = useTransition();
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Form state for settings
+  const [formData, setFormData] = useState({
+    username: profile.username || "",
+    full_name: profile.full_name || "",
+    bio: profile.bio || "",
+    website_url: profile.website_url || "",
+    github_url: profile.github_url || "",
+    twitter_url: profile.twitter_url || "",
+  });
 
   const tabs: { id: TabType; label: string; icon: React.ReactNode }[] = [
     { id: "overview", label: "Overview", icon: <TrendingUp className="h-4 w-4" /> },
@@ -57,6 +74,37 @@ export function DashboardClient({
     creatorSkills.length > 0
       ? creatorSkills.reduce((sum, skill) => sum + Number(skill.rating), 0) / creatorSkills.length
       : 0;
+
+  const handleProfileUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMessage(null);
+
+    startTransition(async () => {
+      const result = await updateProfile(formData);
+
+      if (result.error) {
+        setMessage({ type: "error", text: result.error });
+      } else {
+        setMessage({ type: "success", text: "Profile updated successfully!" });
+        router.refresh();
+      }
+    });
+  };
+
+  const handleBecomeCreator = async () => {
+    setMessage(null);
+
+    startTransition(async () => {
+      const result = await becomeCreator();
+
+      if (result.error) {
+        setMessage({ type: "error", text: result.error });
+      } else {
+        setMessage({ type: "success", text: "You are now a creator!" });
+        router.refresh();
+      }
+    });
+  };
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -195,7 +243,7 @@ export function DashboardClient({
                             <DollarSign className="h-6 w-6 text-[var(--proven-green-500)]" />
                           </div>
                           <div>
-                            <p className="text-2xl font-bold">${totalEarnings.toFixed(2)}</p>
+                            <p className="text-2xl font-bold">${Number(totalEarnings).toFixed(2)}</p>
                             <p className="text-sm text-muted">Total Earnings</p>
                           </div>
                         </div>
@@ -323,7 +371,25 @@ export function DashboardClient({
                     <div className="rounded-2xl bg-card p-6 border border-border">
                       <h2 className="text-xl font-bold mb-6">Profile Settings</h2>
 
-                      <div className="space-y-4">
+                      {message && (
+                        <div
+                          className={cn(
+                            "mb-6 rounded-lg p-4 text-sm",
+                            message.type === "success"
+                              ? "bg-[var(--proven-green-500)]/10 text-[var(--proven-green-500)] border border-[var(--proven-green-500)]/20"
+                              : "bg-[var(--error)]/10 text-[var(--error)] border border-[var(--error)]/20"
+                          )}
+                        >
+                          <div className="flex items-center gap-2">
+                            {message.type === "success" ? (
+                              <Check className="h-4 w-4" />
+                            ) : null}
+                            {message.text}
+                          </div>
+                        </div>
+                      )}
+
+                      <form onSubmit={handleProfileUpdate} className="space-y-4">
                         <div>
                           <label className="block text-sm font-medium mb-2">Email</label>
                           <input
@@ -341,7 +407,8 @@ export function DashboardClient({
                           <label className="block text-sm font-medium mb-2">Username</label>
                           <input
                             type="text"
-                            defaultValue={profile.username || ""}
+                            value={formData.username}
+                            onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                             className="w-full rounded-lg border border-border bg-background px-4 py-2 text-sm focus:border-[var(--proven-green-500)] focus:outline-none"
                           />
                         </div>
@@ -350,7 +417,8 @@ export function DashboardClient({
                           <label className="block text-sm font-medium mb-2">Full Name</label>
                           <input
                             type="text"
-                            defaultValue={profile.full_name || ""}
+                            value={formData.full_name}
+                            onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                             className="w-full rounded-lg border border-border bg-background px-4 py-2 text-sm focus:border-[var(--proven-green-500)] focus:outline-none"
                           />
                         </div>
@@ -358,20 +426,52 @@ export function DashboardClient({
                         <div>
                           <label className="block text-sm font-medium mb-2">Bio</label>
                           <textarea
-                            defaultValue={profile.bio || ""}
+                            value={formData.bio}
+                            onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
                             rows={3}
                             className="w-full rounded-lg border border-border bg-background px-4 py-2 text-sm focus:border-[var(--proven-green-500)] focus:outline-none resize-none"
                           />
                         </div>
 
+                        <div>
+                          <label className="block text-sm font-medium mb-2">Website URL</label>
+                          <input
+                            type="url"
+                            value={formData.website_url}
+                            onChange={(e) => setFormData({ ...formData, website_url: e.target.value })}
+                            placeholder="https://yourwebsite.com"
+                            className="w-full rounded-lg border border-border bg-background px-4 py-2 text-sm focus:border-[var(--proven-green-500)] focus:outline-none"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium mb-2">GitHub URL</label>
+                          <input
+                            type="url"
+                            value={formData.github_url}
+                            onChange={(e) => setFormData({ ...formData, github_url: e.target.value })}
+                            placeholder="https://github.com/username"
+                            className="w-full rounded-lg border border-border bg-background px-4 py-2 text-sm focus:border-[var(--proven-green-500)] focus:outline-none"
+                          />
+                        </div>
+
                         <div className="pt-4">
                           <button
-                            className="rounded-lg bg-[var(--proven-green-500)] px-6 py-2 text-sm font-medium text-white hover:bg-[var(--proven-green-600)] transition-colors"
+                            type="submit"
+                            disabled={isPending}
+                            className="flex items-center gap-2 rounded-lg bg-[var(--proven-green-500)] px-6 py-2 text-sm font-medium text-white hover:bg-[var(--proven-green-600)] transition-colors disabled:opacity-50"
                           >
-                            Save Changes
+                            {isPending ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Saving...
+                              </>
+                            ) : (
+                              "Save Changes"
+                            )}
                           </button>
                         </div>
-                      </div>
+                      </form>
 
                       {!profile.is_creator && (
                         <div className="mt-8 pt-8 border-t border-border">
@@ -379,9 +479,20 @@ export function DashboardClient({
                           <p className="text-sm text-muted mb-4">
                             Start selling your AI skills and earn 80% of every sale.
                           </p>
-                          <LinkButton href="/sell" variant="outline">
-                            Apply to Become a Creator
-                          </LinkButton>
+                          <button
+                            onClick={handleBecomeCreator}
+                            disabled={isPending}
+                            className="flex items-center gap-2 rounded-lg border border-[var(--proven-green-500)] px-4 py-2 text-sm font-medium text-[var(--proven-green-500)] hover:bg-[var(--proven-green-500)]/10 transition-colors disabled:opacity-50"
+                          >
+                            {isPending ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Processing...
+                              </>
+                            ) : (
+                              "Become a Creator"
+                            )}
+                          </button>
                         </div>
                       )}
                     </div>

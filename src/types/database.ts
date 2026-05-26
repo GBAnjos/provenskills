@@ -25,6 +25,8 @@ export type Database = {
           stripe_onboarding_complete: boolean;
           total_sales: number;
           total_earnings: number;
+          skills_count: number;
+          average_rating: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -43,6 +45,8 @@ export type Database = {
           stripe_onboarding_complete?: boolean;
           total_sales?: number;
           total_earnings?: number;
+          skills_count?: number;
+          average_rating?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -61,6 +65,8 @@ export type Database = {
           stripe_onboarding_complete?: boolean;
           total_sales?: number;
           total_earnings?: number;
+          skills_count?: number;
+          average_rating?: number | null;
           created_at?: string;
           updated_at?: string;
         };

@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent } from "@heroui/react";
 import { Shield, Loader2 } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase";
 import { LinkButton } from "@/components/ui";
+import { Suspense } from "react";
 
 function GithubIcon({ className }: { className?: string }) {
   return (
@@ -16,10 +17,19 @@ function GithubIcon({ className }: { className?: string }) {
   );
 }
 
-export default function LoginPage() {
+function LoginContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Check for error in URL params (from OAuth callback)
+  useEffect(() => {
+    const urlError = searchParams.get("error");
+    if (urlError) {
+      setError(decodeURIComponent(urlError));
+    }
+  }, [searchParams]);
 
   const handleGitHubLogin = async () => {
     setLoading(true);
@@ -105,5 +115,19 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-background">
+          <Loader2 className="h-8 w-8 animate-spin text-[var(--proven-green-500)]" />
+        </div>
+      }
+    >
+      <LoginContent />
+    </Suspense>
   );
 }
