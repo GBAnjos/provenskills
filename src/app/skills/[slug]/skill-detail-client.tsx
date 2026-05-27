@@ -26,7 +26,7 @@ import { Header, Footer } from "@/components/layout";
 import { Badge } from "@/components/ui";
 import { Spotlight, BackgroundGradient } from "@/components/ui/aceternity";
 import { cn } from "@/lib/utils";
-import { installFreeSkill } from "@/lib/actions";
+import { installFreeSkill, createReview } from "@/lib/actions";
 import type { SkillWithDetails } from "@/lib/db/skills";
 
 function GithubIcon({ className }: { className?: string }) {
@@ -78,13 +78,19 @@ interface SkillDetailClientProps {
   skill: SkillWithDetails;
   isOwned: boolean;
   isLoggedIn: boolean;
+  hasReviewed: boolean;
 }
 
-export function SkillDetailClient({ skill, isOwned, isLoggedIn }: SkillDetailClientProps) {
+export function SkillDetailClient({ skill, isOwned, isLoggedIn, hasReviewed }: SkillDetailClientProps) {
   const [copied, setCopied] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [installSuccess, setInstallSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewSubmitted, setReviewSubmitted] = useState(hasReviewed);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const router = useRouter();
 
   const handleCopy = () => {
@@ -116,6 +122,26 @@ export function SkillDetailClient({ skill, isOwned, isLoggedIn }: SkillDetailCli
     } else {
       // For paid skills, show coming soon or redirect to checkout
       setError("Paid purchases coming soon! Stripe integration in progress.");
+    }
+  };
+
+  const handleSubmitReview = async () => {
+    setReviewError(null);
+    setIsSubmittingReview(true);
+
+    const result = await createReview({
+      skillId: skill.id,
+      rating: reviewRating,
+      comment: reviewComment || undefined,
+    });
+
+    setIsSubmittingReview(false);
+
+    if (result.error) {
+      setReviewError(result.error);
+    } else {
+      setReviewSubmitted(true);
+      router.refresh();
     }
   };
 
@@ -425,14 +451,98 @@ export function SkillDetailClient({ skill, isOwned, isLoggedIn }: SkillDetailCli
         )}
 
         {/* Reviews */}
-        {skill.reviews && skill.reviews.length > 0 && (
-          <section className="py-12">
-            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">Reviews</h2>
-                <p className="text-muted">{skill.review_count} reviews</p>
-              </div>
+        <section className="py-12">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold">Reviews</h2>
+              <p className="text-muted">{skill.review_count} reviews</p>
+            </div>
 
+            {/* Review Form - Show only if user owns the skill and hasn't reviewed */}
+            {(isOwned || installSuccess) && !reviewSubmitted && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-8 rounded-2xl border border-border bg-card p-6"
+              >
+                <h3 className="font-semibold mb-4">Write a Review</h3>
+
+                {reviewError && (
+                  <div className="mb-4 rounded-lg bg-[var(--error)]/10 border border-[var(--error)]/20 p-3 text-sm text-[var(--error)]">
+                    {reviewError}
+                  </div>
+                )}
+
+                {/* Star Rating */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-2">Rating</label>
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setReviewRating(star)}
+                        className="p-1 transition-transform hover:scale-110"
+                      >
+                        <Star
+                          className={cn(
+                            "h-8 w-8 transition-colors",
+                            star <= reviewRating
+                              ? "fill-yellow-500 text-yellow-500"
+                              : "text-muted hover:text-yellow-500"
+                          )}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Comment */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-2">
+                    Comment (optional)
+                  </label>
+                  <textarea
+                    value={reviewComment}
+                    onChange={(e) => setReviewComment(e.target.value)}
+                    placeholder="Share your experience with this skill..."
+                    rows={3}
+                    className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm focus:border-[var(--proven-green-500)] focus:outline-none focus:ring-1 focus:ring-[var(--proven-green-500)] resize-none"
+                  />
+                </div>
+
+                <button
+                  onClick={handleSubmitReview}
+                  disabled={isSubmittingReview}
+                  className="flex items-center gap-2 rounded-xl bg-[var(--proven-green-500)] px-6 py-3 font-medium text-white hover:bg-[var(--proven-green-600)] transition-colors disabled:opacity-50"
+                >
+                  {isSubmittingReview ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      <Star className="h-4 w-4" />
+                      Submit Review
+                    </>
+                  )}
+                </button>
+              </motion.div>
+            )}
+
+            {reviewSubmitted && !hasReviewed && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-8 rounded-2xl border border-[var(--proven-green-500)]/20 bg-[var(--proven-green-500)]/5 p-6 text-center"
+              >
+                <CheckCircle className="h-8 w-8 text-[var(--proven-green-500)] mx-auto mb-2" />
+                <p className="font-medium">Thank you for your review!</p>
+              </motion.div>
+            )}
+
+            {skill.reviews && skill.reviews.length > 0 ? (
               <div className="space-y-4">
                 {skill.reviews.map((review, i) => (
                   <motion.div
@@ -483,9 +593,14 @@ export function SkillDetailClient({ skill, isOwned, isLoggedIn }: SkillDetailCli
                   </motion.div>
                 ))}
               </div>
-            </div>
-          </section>
-        )}
+            ) : (
+              <div className="text-center py-8 text-muted">
+                <Star className="h-10 w-10 mx-auto mb-3 text-muted" />
+                <p>No reviews yet. Be the first to review this skill!</p>
+              </div>
+            )}
+          </div>
+        </section>
       </main>
 
       <Footer />
