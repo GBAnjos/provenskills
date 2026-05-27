@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { getSkillBySlug } from "@/lib/db";
+import { checkSkillOwnership } from "@/lib/actions";
 import { SkillDetailClient } from "./skill-detail-client";
 import { Header, Footer } from "@/components/layout";
 
@@ -28,7 +29,16 @@ async function SkillDetailData({ slug }: { slug: string }) {
     notFound();
   }
 
-  return <SkillDetailClient skill={skill} />;
+  // Check if current user owns this skill
+  const ownership = await checkSkillOwnership(skill.id);
+
+  return (
+    <SkillDetailClient
+      skill={skill}
+      isOwned={ownership.owned}
+      isLoggedIn={ownership.loggedIn}
+    />
+  );
 }
 
 export default async function SkillDetailPage({

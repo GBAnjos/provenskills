@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -17,11 +18,15 @@ import {
   CheckCircle,
   AlertTriangle,
   Terminal,
+  Loader2,
+  PackageCheck,
+  ShoppingCart,
 } from "lucide-react";
 import { Header, Footer } from "@/components/layout";
 import { Badge } from "@/components/ui";
 import { Spotlight, BackgroundGradient } from "@/components/ui/aceternity";
 import { cn } from "@/lib/utils";
+import { installFreeSkill } from "@/lib/actions";
 import type { SkillWithDetails } from "@/lib/db/skills";
 
 function GithubIcon({ className }: { className?: string }) {
@@ -71,15 +76,47 @@ interface SecurityCheck {
 
 interface SkillDetailClientProps {
   skill: SkillWithDetails;
+  isOwned: boolean;
+  isLoggedIn: boolean;
 }
 
-export function SkillDetailClient({ skill }: SkillDetailClientProps) {
+export function SkillDetailClient({ skill, isOwned, isLoggedIn }: SkillDetailClientProps) {
   const [copied, setCopied] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const [installSuccess, setInstallSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   const handleCopy = () => {
     navigator.clipboard.writeText(skill.install_command);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleInstall = () => {
+    if (!isLoggedIn) {
+      router.push("/login");
+      return;
+    }
+
+    if (skill.is_free) {
+      startTransition(async () => {
+        const result = await installFreeSkill(skill.id);
+        if (result.error) {
+          if (result.alreadyInstalled) {
+            setInstallSuccess(true);
+          } else {
+            setError(result.error);
+          }
+        } else {
+          setInstallSuccess(true);
+          router.refresh();
+        }
+      });
+    } else {
+      // For paid skills, show coming soon or redirect to checkout
+      setError("Paid purchases coming soon! Stripe integration in progress.");
+    }
   };
 
   // Get security checks from the latest scan
@@ -219,9 +256,60 @@ export function SkillDetailClient({ skill }: SkillDetailClientProps) {
 
                     {/* Action Buttons */}
                     <div className="space-y-3">
-                      <button className="w-full rounded-xl bg-[var(--proven-green-500)] py-3 font-medium text-white hover:bg-[var(--proven-green-600)] transition-colors">
-                        {skill.is_free ? "Install Skill" : "Purchase & Install"}
-                      </button>
+                      {error && (
+                        <div className="rounded-lg bg-[var(--error)]/10 border border-[var(--error)]/20 p-3 text-sm text-[var(--error)]">
+                          {error}
+                        </div>
+                      )}
+
+                      {isOwned || installSuccess ? (
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-center gap-2 rounded-xl bg-[var(--proven-green-500)]/10 border border-[var(--proven-green-500)]/20 py-3 text-[var(--proven-green-500)] font-medium">
+                            <PackageCheck className="h-5 w-5" />
+                            Installed
+                          </div>
+                          <button
+                            onClick={handleCopy}
+                            className="flex w-full items-center justify-center gap-2 rounded-xl border border-border py-3 font-medium hover:bg-card transition-colors"
+                          >
+                            {copied ? (
+                              <>
+                                <Check className="h-4 w-4 text-[var(--proven-green-500)]" />
+                                Copied!
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="h-4 w-4" />
+                                Copy Install Command
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={handleInstall}
+                          disabled={isPending}
+                          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--proven-green-500)] py-3 font-medium text-white hover:bg-[var(--proven-green-600)] transition-colors disabled:opacity-50"
+                        >
+                          {isPending ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Installing...
+                            </>
+                          ) : skill.is_free ? (
+                            <>
+                              <Download className="h-4 w-4" />
+                              Install Free
+                            </>
+                          ) : (
+                            <>
+                              <ShoppingCart className="h-4 w-4" />
+                              Purchase ${Number(skill.price).toFixed(2)}
+                            </>
+                          )}
+                        </button>
+                      )}
+
                       {skill.github_url && (
                         <a
                           href={skill.github_url}
